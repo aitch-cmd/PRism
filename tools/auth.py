@@ -12,25 +12,25 @@ auth_server = FastMCP("auth")
 async def get_client(ctx: Context) -> GitHubClient:
     """
     Shared helper — called by every tool.
-    1. Returns a client from the token stored in session state.
-    2. Falls back to GITHUB_PAT in .env for local dev.
+    1. Returns existing client from state if already created this session.
+    2. Creates one from session token or .env fallback.
     3. Raises clearly if neither exists.
     """
-    # 1. Check session state for a token (set by authenticate tool)
-    token = await ctx.get_state("github_token")
+    # Return existing client if already created
+    client = await ctx.get_state("github_client")
+    if client:
+        return client
 
-    # 2. Fall back to .env
-    if not token:
-        token = os.getenv("GITHUB_PAT")
-
+    # Create from token
+    token = await ctx.get_state("github_token") or os.getenv("GITHUB_PAT")
     if not token:
         raise ValueError(
             "🔒 Not authenticated. Call `authenticate` with your GitHub PAT "
             "or set GITHUB_PAT in .env."
         )
 
-    # Create a fresh client each call (token is serializable, client isn't)
     client = GitHubClient(token)
+    await ctx.set_state("github_client", client, serializable=False)
     return client
 
 
@@ -50,12 +50,12 @@ async def authenticate(token: str, ctx: Context) -> str:
         await client.close()
         logger.warning("Token validation failed: %s", exc)
         return f"❌ Authentication failed: {exc}"
-    finally:
-        await client.close()
 
-    # Store only serializable values — token is a string
+    # Store token (serializable) for cross-request persistence
     await ctx.set_state("github_token", token)
     await ctx.set_state("github_user", user["login"])
+    # Store client (non-serializable) for reuse within this request
+    await ctx.set_state("github_client", client, serializable=False)
 
     logger.info("Authenticated as %s", user["login"])
     return f"✅ Authenticated as **{user['login']}**"
