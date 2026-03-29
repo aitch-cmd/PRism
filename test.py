@@ -8,17 +8,20 @@ load_dotenv()
 
 async def test():
     async with Client(mcp) as client:
-        # list all available tools
         tools = await client.list_tools()
         print("Tools:", [t.name for t in tools])
 
-        # authenticate first — list_repos needs this
+        # authenticate
         token = os.getenv("GITHUB_PAT")
         result = await client.call_tool("authenticate", {"token": token})
         print("Auth:", result)
 
-        # now list_repos has a client in session state
-        result = await client.call_tool("list_repos", {"limit": 5})
+        # list repos
+        result = await client.call_tool("list_repos", {"limit": 3})
         print("Repos:", result)
+
+        # get open issues
+        result = await client.call_tool("get_open_issues", {"repo": "aitch-cmd/PRism", "limit": 5})
+        print("Issues:", result)
 
 asyncio.run(test())
