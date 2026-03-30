@@ -1,6 +1,6 @@
 from __future__ import annotations
 from fastmcp import FastMCP, Context
-from logger import get_logger
+from core.logger import get_logger
 from tools.auth import get_client  # same shared helper
 
 logger = get_logger("prism.resources.user")

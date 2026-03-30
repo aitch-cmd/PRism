@@ -3,7 +3,7 @@ import os
 from fastmcp import FastMCP
 from fastmcp.server.lifespan import lifespan
 from dotenv import load_dotenv
-from logger import get_logger
+from core.logger import get_logger
 from tools.auth import auth_server
 from tools.repos import repos_server
 from tools.issues import issues_server

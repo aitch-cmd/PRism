@@ -1,7 +1,7 @@
 from __future__ import annotations
 from typing import Literal
 from fastmcp import FastMCP, Context
-from logger import get_logger
+from core.logger import get_logger
 from tools.auth import get_client
 
 logger = get_logger("prism.tools.prs")
@@ -105,4 +105,45 @@ async def get_pr_diff(
         lines.append(f"\n... [Diff truncated at {max_lines} lines] ...")
 
     return "\n".join(lines)
+
+@prs_server.tool
+async def review_pr(ctx: Context, repo: str, pr_number: int) -> str:
+    """
+    Review a pull request by analyzing its raw diff.
+    Returns a summary, risk flags, and suggested reviewers.
+    """
+    client = await get_client(ctx)
+    await ctx.info(f"Fetching diff for {repo}#{pr_number}...")
+    
+    try:
+        diff_text = await client.get_pr_diff(repo, pr_number)
+    except Exception as exc:
+        logger.warning("Failed to fetch diff for review: %s", exc)
+        return f"❌ Error fetching PR diff: {exc}"
+        
+    lines = diff_text.splitlines()
+    if len(lines) > 1000:
+        await ctx.info("Diff is very large. Truncating for review...")
+        lines = lines[:1000]
+        lines.append("\n... [Diff truncated due to length] ...")
+    diff_text = "\n".join(lines)
+    
+    await ctx.info("Sending diff to Claude for review...")
+    
+    prompt = (
+        "You are an expert code reviewer. Review the following GitHub Pull Request diff.\n"
+        "Provide your review in three sections:\n"
+        "1. **Summary:** A brief 2-3 bullet point summary of what changed.\n"
+        "2. **Risk Flags:** Identify any security risks, performance issues, or bugs. If none, say so.\n"
+        "3. **Suggested Reviewers:** Suggest types of engineers who should review this based on the files changed.\n"
+    )
+    
+    result = await ctx.sample(
+        messages=diff_text,
+        system_prompt=prompt,
+        max_tokens=1500
+    )
+    
+    return result.text
+
 

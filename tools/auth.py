@@ -2,7 +2,7 @@ from __future__ import annotations
 import os
 from fastmcp import FastMCP, Context
 from github_client import GitHubClient, GitHubClientError
-from logger import get_logger
+from core.logger import get_logger
 
 logger = get_logger("prism.tools.auth")
 
