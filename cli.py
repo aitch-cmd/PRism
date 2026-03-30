@@ -16,7 +16,6 @@ from rich.console import Console
 from fastmcp import Client
 from fastmcp.client.transports import StdioTransport
 
-# Modify this to change how the CLI connects to the MCP server.
 CLIENT_SPEC = StdioTransport(command='fastmcp', args=['run', 'D:\\projects\\PRism\\server.py', '--no-banner'])
 
 app = cyclopts.App(name="server", help="CLI for server MCP server")

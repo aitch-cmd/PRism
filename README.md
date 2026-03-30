@@ -1,4 +1,4 @@
-# 🌈 PRism: Autonomous GitHub MCP Server & CLI
+# PRism: Autonomous GitHub MCP Server & CLI
 
 ![Python](https://img.shields.io/badge/Python-3.13+-blue.svg)
 ![MCP](https://img.shields.io/badge/Powered_by-Model_Context_Protocol-purple.svg)
