@@ -9,4 +9,5 @@ dependencies = [
     "python-dotenv>=1.2.2",
     "anthropic>=0.45.0",
     "mcp>=1.2.0",
+    "cyclopts>=4.10.1",
 ]

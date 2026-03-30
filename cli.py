@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 #!/usr/bin/env python3
 """CLI for server MCP server.
 
@@ -109,7 +110,7 @@ async def list_resources() -> None:
         for r in resources:
             console.print(f"  [cyan]{r.uri}[/cyan]")
             desc_parts = [r.name or "", r.description or ""]
-            desc = " — ".join(p for p in desc_parts if p)
+            desc = " â€” ".join(p for p in desc_parts if p)
             if desc:
                 console.print(f"    {desc}")
         console.print()
@@ -156,7 +157,7 @@ async def get_prompt(
     parsed: dict[str, str] = {}
     for arg in arguments:
         if "=" not in arg:
-            console.print(f"[bold red]Error:[/bold red] Invalid argument {arg!r} — expected key=value")
+            console.print(f"[bold red]Error:[/bold red] Invalid argument {arg!r} â€” expected key=value")
             sys.exit(1)
         key, value = arg.split("=", 1)
         parsed[key] = value
@@ -244,7 +245,7 @@ async def get_my_prs(
     limit: Annotated[int, cyclopts.Parameter(help="")] = 30,
 ) -> None:
     '''Get pull requests where the authenticated user is the author or assignee.
-Searches across ALL repos — not limited to a single repo.
+Searches across ALL repos â€” not limited to a single repo.
 
 Call this when the user asks about their PRs, pull requests, or code reviews.
 For example: "What PRs do I have open?", "Show my merged PRs".'''
