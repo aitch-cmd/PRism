@@ -17,7 +17,7 @@ logger = get_logger("prism.server")
 async def prism_lifespan(server):
     logger.info("PRism starting up")
     try:
-        yield {}  # nothing global yet — Phase 2 adds cache, rate limiter
+        yield {} 
     finally:
         logger.info("PRism shutting down")
 

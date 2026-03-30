@@ -60,9 +60,10 @@ class GitHubClient:
         *,
         params: dict[str, Any] | None = None,
         headers: dict[str, str] | None = None,
+        json: Any | None = None,
     ) -> httpx.Response:
         """Fire a single request; raise on non-2xx."""
-        resp = await self._client.request(method, path, params=params, headers=headers)
+        resp = await self._client.request(method, path, params=params, headers=headers, json=json)
         if resp.status_code >= 400:
             body = resp.text[:300]
             logger.error(
@@ -238,6 +239,15 @@ class GitHubClient:
     async def get_pr_reviews(self, repo: str, pr_number: int) -> list[dict[str, Any]]:
         """GET /repos/{owner}/{repo}/pulls/{pr_number}/reviews"""
         resp = await self._request("GET", f"/repos/{repo}/pulls/{pr_number}/reviews")
+        return resp.json()
+
+    async def create_pr_comment(self, repo: str, pr_number: int, body: str) -> dict[str, Any]:
+        """POST /repos/{owner}/{repo}/issues/{pr_number}/comments"""
+        resp = await self._request(
+            "POST",
+            f"/repos/{repo}/issues/{pr_number}/comments",
+            json={"body": body},
+        )
         return resp.json()
 
     # ------------------------------------------------------------------

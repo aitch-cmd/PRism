@@ -167,4 +167,20 @@ async def ci_status(ctx: Context, repo: str, pr_number: int) -> str:
         logger.warning("Failed to fetch CI status: %s", exc)
         return f"❌ Error fetching CI status: {exc}"
 
+@prs_server.tool
+async def comment_on_pr(ctx: Context, repo: str, pr_number: int, body: str) -> str:
+    """
+    Post a review comment on a pull request.
+    Use this to provide feedback, ask questions, or summarize findings on a PR.
+    """
+    client = await get_client(ctx)
+    logger.info("comment_on_pr(repo=%s, pr_number=%d)", repo, pr_number)
+    
+    try:
+        result = await client.create_pr_comment(repo, pr_number, body)
+        return f"✅ Successfully posted comment on PR #{pr_number}. URL: {result.get('html_url')}"
+    except Exception as exc:
+        logger.warning("Failed to post comment on PR: %s", exc)
+        return f"❌ Error posting comment: {exc}"
+
 
