@@ -1,4 +1,5 @@
 from __future__ import annotations
+from collections import Counter
 from typing import Literal
 from fastmcp import FastMCP, Context
 from core.logger import get_logger
@@ -182,5 +183,57 @@ async def comment_on_pr(ctx: Context, repo: str, pr_number: int, body: str) -> s
     except Exception as exc:
         logger.warning("Failed to post comment on PR: %s", exc)
         return f"❌ Error posting comment: {exc}"
+
+@prs_server.tool
+async def assign_reviewer(ctx: Context, repo: str, pr_number: int) -> str:
+    """
+    Automatically determine and assign the best reviewer(s) for a PR based on file commit history.
+    """
+    client = await get_client(ctx)
+    logger.info("assign_reviewer(repo=%s, pr_number=%d)", repo, pr_number)
+    
+    try:
+        # 1. Get PR details to exclude the author
+        pr_detail = await client.get_pr_detail(repo, pr_number)
+        pr_author = pr_detail.get("user", {}).get("login")
+        if not pr_author:
+            return "❌ Could not determine PR author."
+            
+        # 2. Get files modified in the PR
+        files = await client.get_pr_files(repo, pr_number)
+        if not files:
+            return "ℹ️ No files modified in this PR, cannot determine reviewers."
+            
+        # Take the top 5 most modified files to save API calls
+        files = sorted(files, key=lambda f: f.get("changes", 0), reverse=True)[:5]
+        
+        # 3. Tally committers across all these files
+        committers_tally = Counter()
+        for f in files:
+            filename = f.get("filename")
+            if not filename:
+                continue
+            history = await client.get_file_commit_history(repo, filename)
+            for commit in history:
+                author = commit.get("author") or {}
+                login = author.get("login")
+                # Exclude author and bot accounts
+                if login and login != pr_author and "[bot]" not in login and login != "web-flow":
+                    committers_tally[login] += 1
+                    
+        if not committers_tally:
+            return "❌ Could not find any past contributors (other than the author) to assign."
+            
+        # 4. Pick top 1-2 reviewers
+        top_reviewers = [user for user, count in committers_tally.most_common(2)]
+        
+        # 5. Assign them
+        await client.request_pr_review(repo, pr_number, top_reviewers)
+        
+        return f"✅ Successfully assigned reviewer(s): {', '.join(top_reviewers)}"
+        
+    except Exception as exc:
+        logger.warning("Failed to auto-assign reviewer: %s", exc)
+        return f"❌ Error assigning reviewer: {exc}"
 
 

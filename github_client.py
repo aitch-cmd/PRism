@@ -250,6 +250,24 @@ class GitHubClient:
         )
         return resp.json()
 
+    async def get_pr_files(self, repo: str, pr_number: int) -> list[dict[str, Any]]:
+        """GET /repos/{owner}/{repo}/pulls/{pr_number}/files"""
+        return await self._get_paginated(f"/repos/{repo}/pulls/{pr_number}/files")
+
+    async def request_pr_review(self, repo: str, pr_number: int, reviewers: list[str]) -> dict[str, Any]:
+        """POST /repos/{owner}/{repo}/pulls/{pr_number}/requested_reviewers"""
+        resp = await self._request(
+            "POST",
+            f"/repos/{repo}/pulls/{pr_number}/requested_reviewers",
+            json={"reviewers": reviewers},
+        )
+        return resp.json()
+
+    async def get_file_commit_history(self, repo: str, path: str, max_pages: int = 1) -> list[dict[str, Any]]:
+        """GET /repos/{owner}/{repo}/commits?path={path}"""
+        return await self._get_paginated(
+            f"/repos/{repo}/commits", params={"path": path}, max_pages=max_pages
+        )
     # ------------------------------------------------------------------
     # Search (for cross-repo queries like "my PRs")
     # ------------------------------------------------------------------
