@@ -146,4 +146,25 @@ async def review_pr(ctx: Context, repo: str, pr_number: int) -> str:
     
     return result.text
 
+@prs_server.tool
+async def ci_status(ctx: Context, repo: str, pr_number: int) -> str:
+    """
+    Check the GitHub Actions CI run status for a Pull Request.
+    Returns a minimal combined state like 'success', 'pending', or 'failure'.
+    """
+    client = await get_client(ctx)
+    logger.info("ci_status(repo=%s, pr_number=%d)", repo, pr_number)
+    
+    try:
+        pr_detail = await client.get_pr_detail(repo, pr_number)
+        sha = pr_detail.get("head", {}).get("sha")
+        if not sha:
+            return "❌ Unable to find the head commit SHA for this PR."
+        
+        status = await client.get_commit_status(repo, sha)
+        return status
+    except Exception as exc:
+        logger.warning("Failed to fetch CI status: %s", exc)
+        return f"❌ Error fetching CI status: {exc}"
+
 

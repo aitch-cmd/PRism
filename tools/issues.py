@@ -17,12 +17,11 @@ async def get_open_issues(
     limit: int = 30,
 ) -> list[dict]:
     """
-    Get issues for a GitHub repository, optionally filtered by branch label or milestone.
-
-    Call this when the user asks about issues, bugs, or tickets on a repo.
-    The branch filter matches issues whose labels contain the branch name.
-
-    Parameters: repo in "owner/repo" format, branch and milestone are optional filters.
+    Get general open issues for a GitHub repository.
+    
+    Call this when the user asks for a list of open bugs, tasks, or issues on a repo.
+    IMPORTANT: DO NOT use this tool if the user asks for issues linked to a specific git branch. 
+    If they mention a branch, use the `branch_tickets` tool instead.
     """
     client = await get_client(ctx)
 
@@ -57,3 +56,30 @@ async def get_open_issues(
     ]
     logger.info("Returning %d issues", len(issues))
     return issues
+
+@issues_server.tool
+async def branch_tickets(ctx: Context, repo: str, branch_name: str) -> list[dict]:
+    """
+    Find specific tickets or issues that are linked to a given branch_name.
+    
+    USE THIS TOOL (instead of get_open_issues) whenever the user asks about issues connected, 
+    linked, or related to a branch name. It performs a deep search across issue bodies and labels.
+    """
+    client = await get_client(ctx)
+    logger.info("branch_tickets(repo=%s, branch_name=%s)", repo, branch_name)
+
+    # Search the repo for issues that mention the branch name (which catches PR linked bodies, or labels)
+    query = f'repo:{repo} is:issue "{branch_name}"'
+    raw_issues = await client.search_issues(query, max_pages=1, per_page=15)
+
+    tickets = [
+        {
+            "number": i["number"],
+            "title": i["title"],
+            "state": i["state"],
+            "html_url": i["html_url"],
+        }
+        for i in raw_issues
+    ]
+    return tickets
+
