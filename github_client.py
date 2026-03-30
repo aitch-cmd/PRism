@@ -225,9 +225,56 @@ class GitHubClient:
         )
         return resp.text
 
+    async def get_pr_detail(self, repo: str, pr_number: int) -> dict[str, Any]:
+        """GET /repos/{owner}/{repo}/pulls/{pr_number}"""
+        resp = await self._request("GET", f"/repos/{repo}/pulls/{pr_number}")
+        return resp.json()
+
+    async def get_commit_status(self, repo: str, sha: str) -> str:
+        """GET /repos/{owner}/{repo}/commits/{sha}/status"""
+        resp = await self._request("GET", f"/repos/{repo}/commits/{sha}/status")
+        return resp.json().get("state", "unknown")
+
+    async def get_pr_reviews(self, repo: str, pr_number: int) -> list[dict[str, Any]]:
+        """GET /repos/{owner}/{repo}/pulls/{pr_number}/reviews"""
+        resp = await self._request("GET", f"/repos/{repo}/pulls/{pr_number}/reviews")
+        return resp.json()
+
+    # ------------------------------------------------------------------
+    # Search (for cross-repo queries like "my PRs")
+    # ------------------------------------------------------------------
+    async def search_issues(
+        self,
+        query: str,
+        *,
+        max_pages: int = 3,
+        per_page: int = 100,
+    ) -> list[dict[str, Any]]:
+        """
+        GET /search/issues?q={query}
+
+        Returns the `items` list from the search response.
+        """
+        all_items: list[dict[str, Any]] = []
+        page = 1
+        while page <= max_pages:
+            resp = await self._request(
+                "GET",
+                "/search/issues",
+                params={"q": query, "per_page": per_page, "page": page},
+            )
+            data = resp.json()
+            items = data.get("items", [])
+            all_items.extend(items)
+            if len(items) < per_page:
+                break
+            page += 1
+        return all_items
+
     # ------------------------------------------------------------------
     # Orgs
     # ------------------------------------------------------------------
     async def get_user_orgs(self, max_pages: int = 3) -> list[dict[str, Any]]:
         """GET /user/orgs"""
         return await self._get_paginated("/user/orgs", max_pages=max_pages)
+

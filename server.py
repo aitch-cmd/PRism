@@ -7,6 +7,7 @@ from logger import get_logger
 from tools.auth import auth_server
 from tools.repos import repos_server
 from tools.issues import issues_server
+from tools.prs import prs_server
 from resources.user import user_server
 
 load_dotenv()
@@ -32,6 +33,7 @@ mcp = FastMCP(
 mcp.mount(auth_server)
 mcp.mount(repos_server)
 mcp.mount(issues_server)
+mcp.mount(prs_server)
 mcp.mount(user_server)
 
 if __name__ == "__main__":
