@@ -36,7 +36,7 @@ Because PRism is strictly built as an MCP Server, its tools are completely decou
 
 ### Prerequisites
 1. Python 3.13+
-2. A GitHub Personal Access Token (`GITHUB_PAT`)
+2. A GitHub Personal Access Token (`GH_PAT`)
 
 ### Installation
 ```bash
@@ -45,7 +45,7 @@ git clone https://github.com/your-username/PRism.git
 cd PRism
 
 # Create your environment file
-echo "GITHUB_PAT=ghp_your_secret_token" > .env
+echo "GH_PAT=ghp_your_secret_token" > .env
 
 # Run dependency sync
 uv sync

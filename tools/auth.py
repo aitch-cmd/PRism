@@ -22,11 +22,11 @@ async def get_client(ctx: Context) -> GitHubClient:
         return client
 
     # Create from token
-    token = await ctx.get_state("github_token") or os.getenv("GITHUB_PAT")
+    token = await ctx.get_state("github_token") or os.getenv("GH_PAT")
     if not token:
         raise ValueError(
             "🔒 Not authenticated. Call `authenticate` with your GitHub PAT "
-            "or set GITHUB_PAT in .env."
+            "or set GH_PAT in .env."
         )
 
     client = GitHubClient(token)

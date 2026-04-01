@@ -12,7 +12,7 @@ async def test():
         print("Tools:", [t.name for t in tools])
 
         # authenticate
-        token = os.getenv("GITHUB_PAT")
+        token = os.getenv("GH_PAT")
         result = await client.call_tool("authenticate", {"token": token})
         print("Auth:", result)
 
