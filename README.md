@@ -1,9 +1,9 @@
-# PRism: Autonomous GitHub MCP Server & CLI
+# PRism: Autonomous GitHub MCP Server
 
 ![Python](https://img.shields.io/badge/Python-3.13+-blue.svg)
 ![MCP](https://img.shields.io/badge/Powered_by-Model_Context_Protocol-purple.svg)
 
-PRism is an intelligent, agentic GitHub aggregation server designed natively for the **Model Context Protocol (MCP)**. It completely decouples complex GitHub workflows from rigid UIs by serving modular tools that can be dynamically wielded by AI orchestrators (like Claude Desktop or LangGraph agents) or executed headless in CI/CD pipelines via an auto-generated, type-safe CLI.
+PRism is an intelligent, agentic GitHub aggregation server designed natively for the **Model Context Protocol (MCP)**. It completely decouples complex GitHub workflows from rigid UIs by serving modular tools that can be dynamically wielded by AI orchestrators (like Claude Desktop or LangGraph agents).
 
 ## ✨ Features
 
@@ -26,11 +26,10 @@ The architecture is built progressively across three distinct phases of intellig
 
 ## 🏗️ Architecture: The "Write Once, Run Anywhere" Principle
 
-Because PRism is strictly built as an MCP Server, its tools are completely decoupled from its interface. You can interact with PRism in three ways:
+Because PRism is strictly built as an MCP Server, its tools are completely decoupled from its interface. You can interact with PRism in two ways:
 
 1. **Claude Desktop**: Seamlessly load the server so Claude can review your code conversationally.
 2. **Autonomous Agents**: Point independent a2a instances (like LangGraph or Autogen) directly at the server's STDIO to run 24/7 background PR reviews.
-3. **Power-User Static CLI**: The repository ships with `cli.py`, a zero-dependency, rigidly-typed Cyclopts command-line utility auto-generated from the MCP schema (`fastmcp generate-cli`). It allows you to pipe commands straight to GitHub without pinging an LLM.
 
 ## 🚀 Getting Started
 
@@ -52,16 +51,6 @@ uv sync
 ```
 
 ### Usage
-#### The "Power User" CLI
-Run the standalone, zero-dependency generated application:
-```bash
-# View the Morning Briefing dashboard directly in the terminal
-uv run python cli.py call-tool get_morning_briefing
-
-# Have GitHub auto-assign the best reviewer for PR 42 based on blame metrics
-uv run python cli.py call-tool assign_reviewer --repo "owner/my-repo" --pr_number 42
-```
-
 #### Running as an MCP Server
 To use PRism conversationally inside Claude Desktop, mount the server configuration inside your `claude_desktop_config.json`:
 ```json
@@ -78,4 +67,3 @@ To use PRism conversationally inside Claude Desktop, mount the server configurat
 ## 🛠️ Stack & Implementation Details
 - **FastMCP**: Core dependency injection, Tool exposure, and server routing.
 - **Httpx (Async)**: High-speed parallel I/O for `asyncio.gather` dashboard queries.
-- **Cyclopts**: Underpins the dynamic `cli.py` mappings.

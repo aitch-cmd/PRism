@@ -2,7 +2,7 @@ from __future__ import annotations
 import asyncio
 from fastmcp import FastMCP, Context
 from core.logger import get_logger
-from tools.auth import get_client
+from middleware.auth import get_client
 
 logger = get_logger("prism.tools.dashboard")
 

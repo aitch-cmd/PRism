@@ -4,7 +4,7 @@ from fastmcp import FastMCP
 from fastmcp.server.lifespan import lifespan
 from dotenv import load_dotenv
 from core.logger import get_logger
-from tools.auth import auth_server
+from middleware import AuthMiddleware, RateLimitMiddleware
 from tools.repos import repos_server
 from tools.issues import issues_server
 from tools.prs import prs_server
@@ -31,7 +31,9 @@ mcp = FastMCP(
     ),
 )
 
-mcp.mount(auth_server)
+mcp.add_middleware(AuthMiddleware())
+mcp.add_middleware(RateLimitMiddleware())
+
 mcp.mount(repos_server)
 mcp.mount(issues_server)
 mcp.mount(prs_server)
