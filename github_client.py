@@ -278,11 +278,59 @@ class GitHubClient:
         )
         return resp.text
 
+    async def compare_commits(self, repo: str, base: str, head: str) -> dict[str, Any]:
+        """GET /repos/{owner}/{repo}/compare/{base}...{head} as JSON (commits + files)."""
+        resp = await self._request("GET", f"/repos/{repo}/compare/{base}...{head}")
+        return resp.json()
+
+    async def get_repo(self, repo: str) -> dict[str, Any]:
+        """GET /repos/{owner}/{repo} — used to resolve the default branch, etc."""
+        return await self._get_json(f"/repos/{repo}")
+
+    async def find_pr_for_branch(
+        self, repo: str, branch: str, state: str = "open"
+    ) -> dict[str, Any] | None:
+        """
+        GET /repos/{owner}/{repo}/pulls?head={owner}:{branch} — returns the first
+        matching PR (same-repo branches only) or None.
+        """
+        owner = repo.split("/", 1)[0]
+        resp = await self._request(
+            "GET",
+            f"/repos/{repo}/pulls",
+            params={"head": f"{owner}:{branch}", "state": state, "per_page": 1},
+        )
+        items = resp.json()
+        return items[0] if items else None
+
+    async def update_pr(
+        self,
+        repo: str,
+        pr_number: int,
+        *,
+        body: str | None = None,
+        title: str | None = None,
+    ) -> dict[str, Any]:
+        """PATCH /repos/{owner}/{repo}/pulls/{pr_number} — update title and/or body."""
+        payload: dict[str, Any] = {}
+        if body is not None:
+            payload["body"] = body
+        if title is not None:
+            payload["title"] = title
+        resp = await self._request(
+            "PATCH", f"/repos/{repo}/pulls/{pr_number}", json=payload
+        )
+        return resp.json()
+
     async def get_user_events(self, login: str, max_pages: int = 1) -> list[dict[str, Any]]:
         """GET /users/{login}/events/public — for OOO detection."""
         return await self._get_paginated(
             f"/users/{login}/events/public", max_pages=max_pages, per_page=30
         )
+
+    async def get_issue(self, repo: str, number: int) -> dict[str, Any]:
+        """GET /repos/{owner}/{repo}/issues/{number} — also works for PRs."""
+        return await self._get_json(f"/repos/{repo}/issues/{number}")
 
     async def search_issues_count(self, query: str) -> int:
         """GET /search/issues?q={query} — returns only total_count."""
