@@ -268,6 +268,30 @@ class GitHubClient:
         return await self._get_paginated(
             f"/repos/{repo}/commits", params={"path": path}, max_pages=max_pages
         )
+
+    async def compare_commits_diff(self, repo: str, base: str, head: str) -> str:
+        """GET /repos/{owner}/{repo}/compare/{base}...{head} with diff media type."""
+        resp = await self._request(
+            "GET",
+            f"/repos/{repo}/compare/{base}...{head}",
+            headers={"Accept": "application/vnd.github.v3.diff"},
+        )
+        return resp.text
+
+    async def get_user_events(self, login: str, max_pages: int = 1) -> list[dict[str, Any]]:
+        """GET /users/{login}/events/public — for OOO detection."""
+        return await self._get_paginated(
+            f"/users/{login}/events/public", max_pages=max_pages, per_page=30
+        )
+
+    async def search_issues_count(self, query: str) -> int:
+        """GET /search/issues?q={query} — returns only total_count."""
+        resp = await self._request(
+            "GET",
+            "/search/issues",
+            params={"q": query, "per_page": 1},
+        )
+        return resp.json().get("total_count", 0)
     # ------------------------------------------------------------------
     # Search (for cross-repo queries like "my PRs")
     # ------------------------------------------------------------------
