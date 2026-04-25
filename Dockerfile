@@ -24,4 +24,4 @@ COPY . .
 EXPOSE 8000
 
 # Step 5: Start the PRism FastMCP server using FastMCP's SSE HTTP transport built into server.py
-CMD ["uv", "run", "python", "server.py"]
+CMD ["python", "server.py"]

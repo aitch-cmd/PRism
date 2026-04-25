@@ -1,19 +1,16 @@
 """Core PR tools: listing, diffing, reviewing, CI status, commenting."""
 from __future__ import annotations
 
-from typing import Any, Literal
+from typing import Literal
 
 from fastmcp import Context
-from sqlalchemy import select
 
-from core.db import PRReview
 from core.logger import get_logger
 from middleware.auth import get_client
-from middleware.db_session import get_session
 from middleware.error_handling import ValidationError
 
 from ._server import prs_server
-from ._shared import INCREMENTAL_SYSTEM_PROMPT, review_chunks
+from ._shared import review_chunks
 
 logger = get_logger("prism.tools.prs.core")
 
@@ -116,84 +113,23 @@ async def review_pr(ctx: Context, repo: str, pr_number: int) -> str:
     """
     Review a pull request by analyzing its raw diff.
 
-    Stateful: if this PR has been reviewed before, only the code pushed since
-    the last review is re-analyzed, and the response highlights NEW issues
-    instead of re-listing old ones. Large diffs are chunked and map-reduced
-    so PRs over ~2k lines review reliably.
-
-    Returns a summary, risk flags, and suggested reviewer types.
+    Large diffs are chunked and map-reduced so PRs over ~2k lines review
+    reliably. Returns a summary, risk flags, and suggested reviewer types.
     """
     client = await get_client(ctx)
-    session = await get_session(ctx)
-
     pr_detail = await client.get_pr_detail(repo, pr_number)
 
     head_sha = pr_detail.get("head", {}).get("sha")
     if not head_sha:
         raise ValidationError(f"Could not resolve head SHA for {repo}#{pr_number}")
 
-    prior: dict[str, Any] | None = None
-    if session is not None:
-        stmt = (
-            select(PRReview)
-            .where(PRReview.repo == repo, PRReview.pr_number == pr_number)
-            .order_by(PRReview.created_at.desc())
-            .limit(1)
-        )
-        row = (await session.execute(stmt)).scalar_one_or_none()
-        if row is not None:
-            prior = {
-                "head_sha": row.head_sha,
-                "body": row.body,
-                "created_at": row.created_at,
-            }
-
-    if prior and prior["head_sha"] == head_sha:
-        return prior["body"] + "\n\n_(unchanged since last review)_"
-
-    if prior:
-        await ctx.info(
-            f"Incremental review: diffing {prior['head_sha'][:7]}..{head_sha[:7]}"
-        )
-        diff_text = await client.compare_commits_diff(
-            repo, prior["head_sha"], head_sha
-        )
-    else:
-        await ctx.info(f"First-time review of {repo}#{pr_number}")
-        diff_text = await client.get_pr_diff(repo, pr_number)
+    await ctx.info(f"Reviewing {repo}#{pr_number}")
+    diff_text = await client.get_pr_diff(repo, pr_number)
 
     if not diff_text.strip():
-        return "No code changes detected since the last review."
+        return "No code changes detected on this PR."
 
-    if prior:
-        await ctx.info("Running incremental review against prior findings...")
-        result = await ctx.sample(
-            messages=(
-                "## Prior review (for reference only)\n"
-                f"{prior['body']}\n\n"
-                "## New code since that review\n"
-                f"{diff_text}"
-            ),
-            system_prompt=INCREMENTAL_SYSTEM_PROMPT,
-            max_tokens=1200,
-        )
-        review_body = result.text
-    else:
-        review_body = await review_chunks(ctx, diff_text)
-
-    if session is not None:
-        session.add(
-            PRReview(
-                repo=repo,
-                pr_number=pr_number,
-                head_sha=head_sha,
-                body=review_body,
-            )
-        )
-        # DatabaseSessionMiddleware commits on successful return, rolls back on raise.
-        logger.info("Queued review for %s#%d @ %s", repo, pr_number, head_sha[:7])
-
-    return review_body
+    return await review_chunks(ctx, diff_text)
 
 
 @prs_server.tool

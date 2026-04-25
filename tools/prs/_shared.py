@@ -2,7 +2,9 @@
 from __future__ import annotations
 
 import asyncio
+from collections import defaultdict
 from datetime import datetime, timezone
+from typing import Any
 
 from fastmcp import Context
 
@@ -25,18 +27,6 @@ SYNTHESIS_SYSTEM_PROMPT = (
     "1. **Summary:** 2-3 bullets on what the PR does overall.\n"
     "2. **Risk Flags:** consolidated list of bugs/security/perf issues. Say 'None' if clean.\n"
     "3. **Suggested Reviewers:** types of engineers who should look at this, based on the files touched."
-)
-
-INCREMENTAL_SYSTEM_PROMPT = (
-    "You are re-reviewing a pull request that you have seen before. You are "
-    "given (a) your prior review and (b) ONLY the code that has changed since "
-    "that review — not the whole PR.\n\n"
-    "Flag only NEW issues introduced since the last review. If a prior concern "
-    "now looks resolved, call it out briefly. Do not re-list findings that "
-    "still apply unchanged — the reader already has them.\n\n"
-    "Return two sections:\n"
-    "1. **What changed since last review:** 1-3 bullets.\n"
-    "2. **New risks / resolved items:** bullets, or 'No new issues.'"
 )
 
 DESCRIPTION_SYSTEM_PROMPT = (
@@ -183,3 +173,79 @@ def parse_date(s: str) -> datetime | None:
         return datetime.fromisoformat(s.replace("Z", "+00:00"))
     except ValueError:
         return None
+
+
+# ---------------------------------------------------------------------------
+# Path classification — used by review-time estimation, risk scoring, and
+# anywhere else we want to weight tests/configs differently from code.
+# ---------------------------------------------------------------------------
+
+def is_test_file(path: str) -> bool:
+    p = path.lower()
+    return (
+        "/test" in p
+        or "/tests/" in p
+        or p.startswith("test")
+        or "/spec/" in p
+        or "__tests__" in p
+        or p.endswith((
+            "_test.go", "_test.py", "_spec.rb",
+            ".test.ts", ".test.tsx", ".test.js",
+            ".spec.ts", ".spec.tsx", ".spec.js",
+        ))
+    )
+
+
+def is_config_file(path: str) -> bool:
+    p = path.lower()
+    if "dockerfile" in p:
+        return True
+    return p.endswith((
+        ".yml", ".yaml", ".toml", ".ini", ".cfg", ".lock", ".json",
+        ".md", ".txt", ".env", ".gitignore",
+    ))
+
+
+# ---------------------------------------------------------------------------
+# Size buckets — single source of truth for tiny/small/medium/large/huge.
+# Reviewers tooling wants the label only; risk scoring wants both label and
+# a points contribution, so the helper returns both.
+# ---------------------------------------------------------------------------
+
+def size_bucket(total_changes: int, file_count: int) -> tuple[str, float]:
+    """Return (label, points). `points` contributes up to 2.5 to a 0-10 score."""
+    if total_changes <= 50 and file_count <= 3:
+        return "tiny", 0.0
+    if total_changes <= 200 and file_count <= 8:
+        return "small", 0.5
+    if total_changes <= 500 and file_count <= 15:
+        return "medium", 1.5
+    if total_changes <= 1500 and file_count <= 40:
+        return "large", 2.0
+    return "huge", 2.5
+
+
+# ---------------------------------------------------------------------------
+# CI flake detection — same algorithm wherever check runs are inspected.
+# ---------------------------------------------------------------------------
+
+def flaky_check_names(runs: list[dict[str, Any]]) -> list[str]:
+    """
+    Group check-run records by `name`. A name is "flaky" when its history on
+    a single SHA contains both a `failure` and a later `success` — i.e. the
+    same job went red then green without the underlying code changing.
+
+    Returns the list of flaky names (empty when none qualify).
+    """
+    by_name: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for r in runs:
+        by_name[r.get("name") or ""].append(r)
+    flaky: list[str] = []
+    for name, rs in by_name.items():
+        if len(rs) < 2:
+            continue
+        rs.sort(key=lambda r: r.get("started_at") or "")
+        outcomes = [r.get("conclusion") for r in rs]
+        if "failure" in outcomes and outcomes[-1] == "success":
+            flaky.append(name)
+    return flaky

@@ -196,25 +196,8 @@ class GitHubClient:
         )
 
     # ------------------------------------------------------------------
-    # Pull Requests  (placeholder — will be fleshed out in Step 6-7)
+    # Pull Requests
     # ------------------------------------------------------------------
-    async def get_prs(
-        self,
-        repo: str,
-        *,
-        state: str = "open",
-        max_pages: int = 3,
-        per_page: int = 100,
-    ) -> list[dict[str, Any]]:
-        """GET /repos/{owner}/{repo}/pulls"""
-        params: dict[str, Any] = {"state": state}
-        return await self._get_paginated(
-            f"/repos/{repo}/pulls",
-            params=params,
-            max_pages=max_pages,
-            per_page=per_page,
-        )
-
     async def get_pr_diff(
         self, repo: str, pr_number: int
     ) -> str:
@@ -235,6 +218,10 @@ class GitHubClient:
         """GET /repos/{owner}/{repo}/commits/{sha}/status"""
         resp = await self._request("GET", f"/repos/{repo}/commits/{sha}/status")
         return resp.json().get("state", "unknown")
+
+    async def get_commit(self, repo: str, sha: str) -> dict[str, Any]:
+        """GET /repos/{owner}/{repo}/commits/{sha} — full commit detail."""
+        return await self._get_json(f"/repos/{repo}/commits/{sha}")
 
     async def get_pr_reviews(self, repo: str, pr_number: int) -> list[dict[str, Any]]:
         """GET /repos/{owner}/{repo}/pulls/{pr_number}/reviews"""
@@ -377,4 +364,68 @@ class GitHubClient:
     async def get_user_orgs(self, max_pages: int = 3) -> list[dict[str, Any]]:
         """GET /user/orgs"""
         return await self._get_paginated("/user/orgs", max_pages=max_pages)
+
+    # ------------------------------------------------------------------
+    # Check runs (CI history per commit)
+    # ------------------------------------------------------------------
+    async def get_check_runs(
+        self, repo: str, sha: str, *, max_pages: int = 1, per_page: int = 100
+    ) -> list[dict[str, Any]]:
+        """
+        GET /repos/{owner}/{repo}/commits/{sha}/check-runs
+
+        Returns the flat `check_runs` list across pages. The check-runs endpoint
+        wraps results in `{"total_count", "check_runs": [...]}` so we cannot
+        use _get_paginated directly.
+        """
+        all_runs: list[dict[str, Any]] = []
+        page = 1
+        while page <= max_pages:
+            resp = await self._request(
+                "GET",
+                f"/repos/{repo}/commits/{sha}/check-runs",
+                params={"per_page": per_page, "page": page},
+            )
+            data = resp.json()
+            runs = data.get("check_runs", []) or []
+            all_runs.extend(runs)
+            if len(runs) < per_page:
+                break
+            page += 1
+        return all_runs
+
+    # ------------------------------------------------------------------
+    # Code search (cross-repo)
+    # ------------------------------------------------------------------
+    async def search_code(
+        self,
+        query: str,
+        *,
+        max_results: int = 30,
+        per_page: int = 30,
+    ) -> list[dict[str, Any]]:
+        """
+        GET /search/code?q={query}
+
+        Code search has its own (tight) rate limit window — keep `max_results`
+        small. Returns the `items` list; each item has `path`, `html_url`,
+        and a `repository` block.
+        """
+        per_page = max(1, min(per_page, 100))
+        max_results = max(1, min(max_results, 100))
+        items: list[dict[str, Any]] = []
+        page = 1
+        while len(items) < max_results:
+            resp = await self._request(
+                "GET",
+                "/search/code",
+                params={"q": query, "per_page": per_page, "page": page},
+            )
+            data = resp.json()
+            page_items = data.get("items", [])
+            items.extend(page_items)
+            if len(page_items) < per_page:
+                break
+            page += 1
+        return items[:max_results]
 

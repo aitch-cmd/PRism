@@ -13,7 +13,13 @@ from middleware.auth import get_client
 from middleware.error_handling import ValidationError
 
 from ._server import prs_server
-from ._shared import hours_between, parse_iso
+from ._shared import (
+    hours_between,
+    is_config_file,
+    is_test_file,
+    parse_iso,
+    size_bucket,
+)
 
 logger = get_logger("prism.tools.prs.reviewers")
 
@@ -266,29 +272,6 @@ _SPLIT_FILES = 15
 _SPLIT_MODULES = 3
 
 
-def _file_category(path: str) -> str:
-    p = path.lower()
-    if (
-        "/test" in p
-        or p.startswith("test")
-        or p.endswith("_test.go")
-        or p.endswith(".test.ts")
-        or p.endswith(".test.tsx")
-        or p.endswith(".test.js")
-        or p.endswith(".spec.ts")
-        or p.endswith(".spec.js")
-        or "/spec/" in p
-        or "__tests__" in p
-    ):
-        return "test"
-    if p.endswith((
-        ".yml", ".yaml", ".toml", ".ini", ".cfg", ".lock", ".json",
-        ".md", ".txt", ".env", ".dockerfile",
-    )) or "dockerfile" in p or p.endswith(".gitignore"):
-        return "config"
-    return "code"
-
-
 def _top_module(path: str) -> str:
     # First non-dot segment — e.g. "tools/prs.py" → "tools", "src/a/b.ts" → "src".
     parts = [seg for seg in path.split("/") if seg and not seg.startswith(".")]
@@ -300,27 +283,15 @@ def _estimate_review_hours(files: list[dict[str, Any]]) -> float:
     for f in files:
         path = f.get("filename") or ""
         changes = int(f.get("changes") or 0)
-        cat = _file_category(path)
-        weight = (
-            _TEST_WEIGHT if cat == "test"
-            else _CONFIG_WEIGHT if cat == "config"
-            else _CODE_WEIGHT
-        )
+        if is_test_file(path):
+            weight = _TEST_WEIGHT
+        elif is_config_file(path):
+            weight = _CONFIG_WEIGHT
+        else:
+            weight = _CODE_WEIGHT
         weighted_lines += changes * weight
     overhead = _PER_FILE_OVERHEAD * max(len(files) - 1, 0)
     return (weighted_lines + overhead) / _LINES_PER_HOUR
-
-
-def _size_category(total_changes: int, file_count: int) -> str:
-    if total_changes <= 50 and file_count <= 3:
-        return "tiny"
-    if total_changes <= 200 and file_count <= 8:
-        return "small"
-    if total_changes <= _SPLIT_LINES and file_count <= _SPLIT_FILES:
-        return "medium"
-    if total_changes <= 1500 and file_count <= 40:
-        return "large"
-    return "huge"
 
 
 def _split_suggestion(files: list[dict[str, Any]]) -> dict[str, Any]:
@@ -446,7 +417,7 @@ async def suggest_reviewers_for_diff(
     review_hours = _estimate_review_hours(files)
     review_minutes = max(5, int(round(review_hours * 60)))
 
-    size = _size_category(total_changes, len(files))
+    size, _ = size_bucket(total_changes, len(files))
     split = _split_suggestion(files)
 
     top_paths = [
